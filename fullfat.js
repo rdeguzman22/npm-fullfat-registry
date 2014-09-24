@@ -13,7 +13,7 @@ var util = require('util')
 var crypto = require('crypto')
 var once = require('once')
 var parse = require('parse-json-response')
-var hh = require('http-https')
+var request = require('request')
 
 var version = require('./package.json').version
 var ua = 'npm FullFat/' + version + ' node/' + process.version
@@ -66,7 +66,6 @@ function FullFat(conf) {
 
   this.boundary = 'npmFullFat-' + crypto.randomBytes(6).toString('base64')
 
-  this.proxy = conf.proxy ? url.parse(conf.proxy) : false
   this.proxySkim = conf.proxy_skim
   this.proxyFat = conf.proxy_fat
   this.proxyTarballs = conf.proxy_tarballs
@@ -83,14 +82,17 @@ function FullFat(conf) {
       headers['connection'] = 'close'
     }
 
-    var opt = (allowProxy && this.proxy) ? this.proxy : url.parse(reqUrl)
-    if (allowProxy && this.proxy) {
-      opt.path = reqUrl
+    var opt = {
+      url: reqUrl,
+      method: method,
+      headers: headers,
     }
-    opt.method = method
-    opt.headers = headers
 
-    return method !== 'GET' ? hh.request(opt) : hh.get(opt)
+    if (allowProxy !== true) {
+      opt.proxy = false
+    }
+
+    return request(opt)
   }
 
   this._reqSkim = function(reqUrl, method, headers) {
@@ -482,7 +484,12 @@ FullFat.prototype.putAttachments = function(req, change, boundaries, send) {
   }.bind(this))
 
   fstr.on('error', this.emit.bind(this, 'error', 'get tmp attachment ' + name))
-  fstr.pipe(req, { end: false })
+
+  // this isn't respecting .pipe() semantics - it won't pause fstr stream if req stream gets behind.
+  // I think this should be okay though - tarballs are generally not so big that they'll overflow internal buffers.
+  fstr.on('data', function(chunk) {
+    req.write(chunk)
+  })
 }
 
 FullFat.prototype.onputres = function(change, er, data, res) {
