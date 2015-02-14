@@ -585,7 +585,11 @@ FullFat.prototype.onattres = function(change, need, did, v, r, res) {
     var er = new Error('Error fetching attachment: ' + att)
     er.statusCode = res.statusCode
     er.code = 'attachment-fetch-fail'
-    if (this.missingLog)
+    if (this.missingLog === true) {
+      this.emit('missing', att)
+      return skip()
+    }
+    else if (this.missingLog)
       return fs.appendFile(this.missingLog, att + '\n', skip)
     else
       return this.emit('error', er)
