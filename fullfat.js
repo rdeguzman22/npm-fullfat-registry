@@ -592,7 +592,8 @@ FullFat.prototype.onattres = function(change, need, did, v, r, res) {
     else if (this.missingLog)
       return fs.appendFile(this.missingLog, att + '\n', skip)
     else
-      return this.emit('error', er)
+      this.emit('missing', er)
+      return skip()
   }
 
   var fstr = fs.createWriteStream(file)
